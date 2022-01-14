@@ -1,0 +1,54 @@
+package com.microservice.currencyconversionservice.service;
+
+import java.math.BigDecimal;
+import java.util.HashMap;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import com.microservice.currencyconversionservice.entity.CurrencyConversion;
+
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+
+@Service
+public class CurrencyConversionService {
+	
+	@Autowired
+	RestTemplate restTemplate;
+	
+	private static final String CURRENCY_EXCHANGE = "currency-exchange";
+	
+	//@CircuitBreaker(name=CURRENCY_EXCHANGE, fallbackMethod = "currencyExchangeFallback")
+	public CurrencyConversion calculateCurrencyConversion(String from, String to, BigDecimal quantity) {
+		HashMap<String, String> uriVariables = new HashMap<>();
+		uriVariables.put("from",from);
+		uriVariables.put("to",to);
+		
+		ResponseEntity<CurrencyConversion> responseEntity = this.restTemplate.getForEntity
+				("http://currency-exchange/currency-exchange/from/{from}/to/{to}", 
+						CurrencyConversion.class, uriVariables);
+//		("http://localhost:8000/currency-exchange/from/{from}/to/{to}", 
+//				CurrencyConversion.class, from,to);
+		
+		CurrencyConversion currencyConversion = responseEntity.getBody();
+		System.out.println("body"+currencyConversion);
+		return new CurrencyConversion(currencyConversion.getId(), 
+				from, to, quantity, 
+				currencyConversion.getConversionMultiple(), 
+				quantity.multiply(currencyConversion.getConversionMultiple()), 
+				currencyConversion.getEnvironment()+ " " + "rest template");
+	}
+	
+	public ResponseEntity<CurrencyConversion> currencyExchangeFallback(Exception e){
+		CurrencyConversion conversion = new CurrencyConversion();
+		conversion.setId(2L);
+		conversion.setFrom("ER");
+		conversion.setTo("USD");
+		return new ResponseEntity<CurrencyConversion>(conversion,HttpStatus.OK);
+	}
+	
+
+}
